@@ -22,6 +22,15 @@ export interface IComment {
     }[];
 }
 
-export interface IRequestResult {
-    status: 'ok';
+export interface IRequestResult<T = IVoid> {
+    _returnType?: T;
+}
+
+export interface IVoid{
+
+}
+
+export interface IRegisterUser extends IRequestResult {
+    username: string;
+    password: string;
 }

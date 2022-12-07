@@ -97,6 +97,9 @@ export default (async () => {
     assert.strict.ok(files !== null);
 
     for(const f of files){
+        if(!f.contents){
+            continue;
+        }
         const outFile = path.resolve(outDir,f.outFile);
         await fs.promises.mkdir(path.dirname(outFile),{
             recursive: true

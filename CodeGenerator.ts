@@ -488,6 +488,15 @@ export default class CodeGenerator extends CodeStream {
                     expression = null;
                     typeOfCheck = 'function';
                     break;
+                /**
+                 * if we reach here, it probably means that we
+                 * have an interface that is using template arguments,
+                 * so right now is not possible to test them
+                 */
+                case ts.SyntaxKind.TypeReference:
+                    expression = 'true';
+                    typeOfCheck = null;
+                    break;
                 default:
                     expression = typeOfCheck = null;
             }
