@@ -449,7 +449,16 @@ export default class CodeGenerator extends CodeStream {
         } else {
             let expression: string | null;
             let typeOfCheck: string | null;
-            switch(typeNode.kind){
+            let target: ts.TypeNode | ts.NullLiteral | ts.BooleanLiteral | ts.LiteralExpression | ts.PrefixUnaryExpression;
+            if(ts.isLiteralTypeNode(typeNode)){
+                const {
+                    literal
+                } = typeNode;
+                target = literal;
+            } else {
+                target = typeNode;
+            }
+            switch(target.kind){
                 case ts.SyntaxKind.LiteralType:
                     if(tsType.isLiteral()) {
                         if(typeof tsType.value === 'string'){
@@ -497,10 +506,19 @@ export default class CodeGenerator extends CodeStream {
                     expression = 'true';
                     typeOfCheck = null;
                     break;
+                case ts.SyntaxKind.TrueKeyword:
+                    expression = `${varName} === true`;
+                    typeOfCheck = null;
+                    break;
+                case ts.SyntaxKind.FalseKeyword:
+                    expression = `${varName} === false`;
+                    typeOfCheck = null;
+                    break;
                 default:
                     expression = typeOfCheck = null;
             }
             if(expression === null && typeOfCheck === null){
+                debugger;
                 console.error('unhandled node kind: %d',typeNode.kind);
                 return false;
             }

@@ -34,3 +34,8 @@ export interface IRegisterUser extends IRequestResult {
     username: string;
     password: string;
 }
+
+export interface IError {
+    isError: true;
+    message: string;
+}
