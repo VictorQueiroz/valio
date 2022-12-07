@@ -37,5 +37,5 @@ export interface IRegisterUser extends IRequestResult {
 
 export interface IError {
     isError: true;
-    message: string;
+    message: string | number;
 }

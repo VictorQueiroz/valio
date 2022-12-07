@@ -446,6 +446,30 @@ export default class CodeGenerator extends CodeStream {
                     return false;
                 }
             }
+        } else if(ts.isUnionTypeNode(typeNode)) {
+            let status = true;
+            this.write('if(\n', () => {
+                const lastType = typeNode.types[typeNode.types.length - 1];
+                for(const type of typeNode.types){
+                    this.write('!(() => (\n', () => {
+                        this.write('');
+                        if(!this.#generateTypeValidationExpression({
+                            typeNode: type,
+                            varName
+                        })){
+                            status = false;
+                        }
+                        this.append('\n');
+                    },'))()');
+                    if(type !== lastType){
+                        this.append(' &&');
+                    }
+                    this.append('\n');
+                }
+            },') return false;\n');
+            if(!status){
+                return false;
+            }
         } else {
             let expression: string | null;
             let typeOfCheck: string | null;
