@@ -61,6 +61,7 @@ export default class CodeGenerator extends CodeStream {
             ){
                 continue;
             }
+            console.log('reading file: %s',sourceFile.fileName);
             interfaceName = path.basename(sourceFile.fileName).replace(/\.[a-zA-Z0-9]+$/,'');
             interfaceName = `${interfaceName[0]?.toLocaleUpperCase()}${interfaceName.substring(1)}`;
             const current: IGeneratedFile = {
