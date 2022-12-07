@@ -1,0 +1,32 @@
+{
+  "devDependencies": {
+    "@types/glob": "8.x",
+    "@types/node": "16.x",
+    "prettier": "2.x",
+    "ts-node": "10.x"
+  },
+  "version": "0.0.1",
+  "license": "MIT",
+  "name": "valio",
+  "dependencies": {
+    "glob": "8.x",
+    "typescript": "4.x"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.d.ts",
+    "**/*.map"
+  ],
+  "bin": {
+    "valio": "./cli/index.js"
+  },
+  "keywords": [
+    "typescript",
+    "validation"
+  ],
+  "scripts": {
+    "prepack": "npx tsc",
+    "test": "npx tsc && npx ts-node cli",
+    "prepublishOnly": "npx tsc"
+  }
+}
