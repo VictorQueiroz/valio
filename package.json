@@ -5,7 +5,7 @@
     "prettier": "2.x",
     "ts-node": "10.x"
   },
-  "version": "0.0.4",
+  "version": "0.0.5",
   "license": "MIT",
   "name": "valio",
   "dependencies": {
