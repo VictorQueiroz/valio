@@ -5,7 +5,7 @@
     "prettier": "2.x",
     "ts-node": "10.x"
   },
-  "version": "0.0.6",
+  "version": "0.0.7",
   "license": "MIT",
   "name": "valio",
   "dependencies": {
@@ -27,7 +27,7 @@
   "scripts": {
     "prepack": "yarn run build",
     "test": "yarn run build && npx ts-node cli",
-    "build":"npx tsc -b . --force",
+    "build": "npx tsc -b . --force",
     "prepublishOnly": "yarn run build"
   }
 }
