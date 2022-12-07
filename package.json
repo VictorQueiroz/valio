@@ -25,8 +25,9 @@
     "validation"
   ],
   "scripts": {
-    "prepack": "npx tsc",
-    "test": "npx tsc && npx ts-node cli",
-    "prepublishOnly": "npx tsc"
+    "prepack": "yarn run build",
+    "test": "yarn run build && npx ts-node cli",
+    "build":"npx tsc -b . --force",
+    "prepublishOnly": "yarn run build"
   }
 }
