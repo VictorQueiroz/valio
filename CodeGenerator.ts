@@ -592,6 +592,14 @@ export default class CodeGenerator extends CodeStream {
                     expression = `Array.isArray(${varName})`;
                     typeOfCheck = null;
                     break;
+                case ts.SyntaxKind.StringLiteral:
+                    if(!ts.isStringLiteral(target)){
+                        expression = typeOfCheck = null;
+                        break;
+                    }
+                    expression = `${varName} === "${target.text}"`;
+                    typeOfCheck = null;
+                    break;
                 case ts.SyntaxKind.NullKeyword:
                     expression = `${varName} === null`;
                     typeOfCheck = null;
@@ -608,6 +616,10 @@ export default class CodeGenerator extends CodeStream {
                 case ts.SyntaxKind.TypeReference:
                     expression = 'true';
                     typeOfCheck = null;
+                    break;
+                case ts.SyntaxKind.BooleanKeyword:
+                    expression = null;
+                    typeOfCheck = 'boolean';
                     break;
                 case ts.SyntaxKind.TrueKeyword:
                     expression = `${varName} === true`;
