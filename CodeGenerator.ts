@@ -155,9 +155,12 @@ export default class CodeGenerator extends CodeStream {
                     continue;
                 }
                 this.write(`"${member.name.escapedText}": `);
-                this.#generateDefaultExpression({
+                if(!this.#generateDefaultExpression({
                     typeNode: member.type
-                });
+                })){
+                    console.error('failed to generate default expression for member kind: %d',member.type.kind);
+                    continue;
+                }
                 if(member !== lastMember || extendExpression){
                     this.append(',')
                 }
@@ -173,15 +176,13 @@ export default class CodeGenerator extends CodeStream {
         }
         this.append('));\n')
     }
-    #generateDefaultExpression({
-        typeNode
-    }: {
+    #generateDefaultExpression({typeNode}: {
         typeNode: ts.TypeNode;
     }) {
         const resolved = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
         if(resolved.isClass()){
             this.append(`new ${resolved.symbol.escapedName.toString()}()`);
-        } else if(resolved.isClassOrInterface() || ts.isTypeLiteralNode(typeNode)) {
+        } else if(resolved.isClassOrInterface()) {
             switch(resolved.symbol.escapedName){
                 case 'Date':
                     this.append('new Date(0)');
@@ -226,8 +227,55 @@ export default class CodeGenerator extends CodeStream {
                 }
             }
         } else if(resolved.isUnion()) {
-            console.error('union is not supported yet: %o',resolved);
-            return false;
+            const [type] = resolved.types;
+            if(!type){
+                return false;
+            }
+            const typeNode = this.#program.getTypeChecker().typeToTypeNode(
+                type,
+                undefined,
+                undefined
+            );
+            if(!typeNode){
+                console.error('failed to get type node from type: %o',type)
+                return false;
+            }
+            if(!this.#generateDefaultExpression({
+                typeNode
+            })) {
+                return false;
+            }
+        } else if(ts.isTypeLiteralNode(typeNode)){
+            this.append('{\n');
+            this.indentBlock(() => {
+                const lastMember = typeNode.members[typeNode.members.length-1];
+                for(const m of typeNode.members){
+                    if(!m.name){
+                        console.error(
+                            'a member of type node does not come with a "%s" property: %o',
+                            'name',
+                            m
+                        );
+                        continue;
+                    }
+                    if(!ts.isPropertySignature(m) || !m.type){
+                        console.error('could not handle member: %o',m);
+                        continue;
+                    }
+                    this.write(`"${m.name.getText()}": `);
+                    if(!this.#generateDefaultExpression({
+                        typeNode: m.type
+                    })){
+                        console.error('failed to generate default expression kind: %d',m.type.kind);
+                        continue;
+                    }
+                    if(m !== lastMember){
+                        this.append(',');
+                    }
+                    this.append('\n');
+                }
+            });
+            this.write('}');
         } else {
             switch(typeNode.kind){
                 case ts.SyntaxKind.NumberKeyword:
@@ -242,17 +290,48 @@ export default class CodeGenerator extends CodeStream {
                 case ts.SyntaxKind.ArrayType:
                     this.append('[]');
                     break;
+                case ts.SyntaxKind.TypeReference:
+                    if(resolved.isTypeParameter()){
+                        this.append('undefined');
+                    } else {
+                        console.error('could not process type node kind: %d',typeNode.kind);
+                        return false;
+                    }
+                    break;
                 case ts.SyntaxKind.LiteralType:
                     if(resolved.isStringLiteral()){
                         this.append(`"${resolved.value}"`);
+                    } else if(resolved.isUnion()) {
+                        const [type] = resolved.types;
+                        if(!type){
+                            return false;
+                        }
+                        const typeNode = this.#program.getTypeChecker().typeToTypeNode(
+                            type,
+                            undefined,
+                            undefined
+                        );
+                        if(!typeNode || !this.#generateDefaultExpression({
+                            typeNode
+                        })){
+                            return false;
+                        }
                     } else {
                         this.append('null');
                     }
                     break;
+                case ts.SyntaxKind.BooleanKeyword:
+                    this.append('false');
+                    break;
+                case ts.SyntaxKind.TrueKeyword:
+                    this.append('true');
+                    break;
+                case ts.SyntaxKind.FalseKeyword:
+                    this.append('false');
+                    break;
                 default:
-                    this.append(`null`);
+                    return false;
             }
-            return false;
         }
         return true;
     }
@@ -553,127 +632,12 @@ export default class CodeGenerator extends CodeStream {
                 this.write(`if(!(${expression})) return false;\n`);
             }
             return true;
-            // this.write('if(!(\n', () => {
-            //     this.write('');
-            //     if(!this.#generateTypeValidationExpression({
-            //         varName,
-            //         typeNode
-            //     })){
-            //         console.error('failed to create validation expression: %o',typeNode);
-            //         result = false;
-            //     }
-            //     this.append('\n');
-            // },')) {\n');
-            // this.indentBlock(() => {
-            //     this.write('return false;\n');
-            // })
-            // this.write('}\n');
         }
         return result;
     }
-    // #generateTypeValidationCode(options:{
-    //     varName: string;
-    //     expression: {
-    //         typeNode: ts.TypeNode;
-    //     } | {
-    //         type: ts.Type;
-    //     };
-    // }){
-    //     const {
-    //         varName,
-    //         expression
-    //     } = options;
-    //     let result = true;
-    //     if('type' in expression){
-    //         const {type} = expression;
-    //         if(type.isClassOrInterface() && type.symbol.members){
-    //             const members = new Set<ts.Symbol>();  
-    //             type.symbol.members.forEach(m => {
-    //                 members.add(m);
-    //             });
-    //             for(const m of members){
-    //                 const {
-    //                     valueDeclaration
-    //                 } = m;
-    //                 if(
-    //                     !valueDeclaration || !ts.isPropertySignature(valueDeclaration) ||
-    //                     !valueDeclaration.type
-    //                 ){
-    //                     // console.log('ignoring property: %s',m.name)
-    //                     continue;
-    //                 }
-    //                 if(!this.#generateTypeValidationCode({
-    //                     ...options,
-    //                     varName: `${varName}['${m.name}']`,
-    //                     expression: {
-    //                         typeNode: valueDeclaration.type
-    //                     }
-    //                 })){
-    //                     return false;
-    //                 }
-    //             }
-    //         }
-            
-    //         // for(const member of type.members){
-    //         //     if(
-    //         //         !ts.isPropertySignature(member) || !ts.isIdentifier(member.name) ||
-    //         //         !member.type
-    //         //     ){
-    //         //         continue;
-    //         //     }
-    //         //     this.#generateTypeValidationCode({
-    //         //         ...sourceInfo,
-    //         //         expression: {
-    //         //             typeNode: member.type
-    //         //         },
-    //         //         varName: `value['${member.name.escapedText}']`
-    //         //     })
-    //         // }
-    //     } else {
-    //         // console.log(expression.typeNode);
-    //         const type = this.#program.getTypeChecker().getTypeFromTypeNode(expression.typeNode);
-    //         if(type.isClassOrInterface() && type.symbol.members) {
-    //             this.write(`if(!${this.#require('isUnknownObject')}(${varName})) return false;\n`);
-    //             type.symbol.members.forEach(m => {
-    //                 if(
-    //                     !m.valueDeclaration ||
-    //                     !ts.isPropertySignature(m.valueDeclaration) ||
-    //                     !m.valueDeclaration.type
-    //                 ){
-    //                     return;
-    //                 }
-    //                 const {
-    //                     type
-    //                 } = m.valueDeclaration;
-    //                 this.write('if(!(');
-    //                 if(!this.#generateTypeValidationExpression({
-    //                     ...options,
-    //                     typeNode: type,
-    //                     varName: `${varName}['${m.escapedName}']`
-    //                 })){
-    //                     console.error(
-    //                         'failed to generate type validation expression: %o',
-    //                         type
-    //                     );
-    //                     result = false;
-    //                 }
-    //                 this.append(')) {\n');
-    //                 this.indentBlock(() => {
-    //                     this.write('return false;\n');
-    //                 });
-    //                 this.write('}\n');
-    //             });
-    //             this.write('return true;\n');
-    //         } else {
-    //             console.log(type,expression.typeNode);
-    //             this.write('if(true) return false;\n');
-    //         }
-    //     }
-    //     return result;
-    // }
     async #onNode(node: ts.Node){
         if(ts.isInterfaceDeclaration(node)){
-            if(!await this.#generateValidateDeclarationFile(
+            if(!this.#generateValidateDeclarationFile(
                 node
             )){
                 console.error(
