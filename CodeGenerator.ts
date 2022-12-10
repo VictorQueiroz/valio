@@ -44,12 +44,6 @@ export default class CodeGenerator extends CodeStream {
             },
             rootNames: this.#include
         });
-        // FIXME: it's obvious
-        this.#destinationFolder;
-        this.#outFiles;
-        this.#rootDir;
-        this.#require;
-        this.#generateTypeValidationExpression;
     }
     public async generate(){
         let interfaceName: string;
@@ -158,6 +152,7 @@ export default class CodeGenerator extends CodeStream {
                 if(!this.#generateDefaultExpression({
                     typeNode: member.type
                 })){
+                    debugger;
                     console.error('failed to generate default expression for member kind: %d',member.type.kind);
                     continue;
                 }
@@ -182,6 +177,7 @@ export default class CodeGenerator extends CodeStream {
         const resolved = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
         if(resolved.isClass()){
             this.append(`new ${resolved.symbol.escapedName.toString()}()`);
+            return true;
         } else if(resolved.isClassOrInterface()) {
             switch(resolved.symbol.escapedName){
                 case 'Date':
@@ -192,15 +188,18 @@ export default class CodeGenerator extends CodeStream {
                         members
                     } = resolved.symbol; 
                     if(!members){
+                        console.error('no members property available on resolved type: %o',resolved);
                         return false;
                     }
                     this.append('Object.seal(Object.freeze({\n');
                     this.indentBlock(() => {
                         let lastMember: ts.Symbol | null = null;
+                        const symbols = new Set<ts.Symbol>();
                         members.forEach(member => {
+                            symbols.add(member);
                             lastMember = member;
                         });
-                        members.forEach(member => {
+                        for(const member of symbols) {
                             const {
                                 valueDeclaration
                             } = member;
@@ -209,26 +208,30 @@ export default class CodeGenerator extends CodeStream {
                                 !ts.isPropertySignature(valueDeclaration) || !ts.isIdentifier(valueDeclaration.name) ||
                                 !valueDeclaration.type
                             ){
+                                console.error('validation failed for node: %o',valueDeclaration);
                                 return;
                             }
                             this.write(`"${valueDeclaration.name.escapedText}": `);
                             if(!this.#generateDefaultExpression({
                                 typeNode: valueDeclaration.type
                             })){
+                                console.error('failed to generate default expression for node kind: %d',valueDeclaration.type.kind);
                                 return;
                             }
                             if(member !== lastMember){
                                 this.append(',')
                             }
                             this.append('\n');
-                        });
+                        }
                     });
                     this.write('}))');
                 }
             }
+            return true;
         } else if(resolved.isUnion()) {
             const [type] = resolved.types;
             if(!type){
+                console.error('union with no types: %o',resolved.types);
                 return false;
             }
             const typeNode = this.#program.getTypeChecker().typeToTypeNode(
@@ -243,8 +246,10 @@ export default class CodeGenerator extends CodeStream {
             if(!this.#generateDefaultExpression({
                 typeNode
             })) {
+                console.error('failed to generate default expression for type node: %o',typeNode);
                 return false;
             }
+            return true;
         } else if(ts.isTypeLiteralNode(typeNode)){
             this.append('{\n');
             this.indentBlock(() => {
@@ -276,62 +281,69 @@ export default class CodeGenerator extends CodeStream {
                 }
             });
             this.write('}');
-        } else {
-            switch(typeNode.kind){
-                case ts.SyntaxKind.NumberKeyword:
-                    this.append('0');
-                    break;
-                case ts.SyntaxKind.StringKeyword:
-                    this.append('\'\'');
-                    break;
-                case ts.SyntaxKind.NullKeyword:
-                    this.append('null');
-                    break;
-                case ts.SyntaxKind.ArrayType:
-                    this.append('[]');
-                    break;
-                case ts.SyntaxKind.TypeReference:
-                    if(resolved.isTypeParameter()){
-                        this.append('undefined');
-                    } else {
-                        console.error('could not process type node kind: %d',typeNode.kind);
-                        return false;
-                    }
-                    break;
-                case ts.SyntaxKind.LiteralType:
-                    if(resolved.isStringLiteral()){
-                        this.append(`"${resolved.value}"`);
-                    } else if(resolved.isUnion()) {
-                        const [type] = resolved.types;
-                        if(!type){
-                            return false;
-                        }
-                        const typeNode = this.#program.getTypeChecker().typeToTypeNode(
-                            type,
-                            undefined,
-                            undefined
-                        );
-                        if(!typeNode || !this.#generateDefaultExpression({
-                            typeNode
-                        })){
-                            return false;
-                        }
-                    } else {
-                        this.append('null');
-                    }
-                    break;
-                case ts.SyntaxKind.BooleanKeyword:
-                    this.append('false');
-                    break;
-                case ts.SyntaxKind.TrueKeyword:
-                    this.append('true');
-                    break;
-                case ts.SyntaxKind.FalseKeyword:
-                    this.append('false');
-                    break;
-                default:
-                    return false;
+            return true;
+        } else if(ts.isUnionTypeNode(typeNode)){
+            const [first] = typeNode.types;
+            if(!first){
+                console.error('type node from union type node was empty');
+                return false;
             }
+            if(!this.#generateDefaultExpression({
+                typeNode: first
+            })){
+                console.error('failed to generate default expression for node kind: %d',first.kind);
+                return false;
+            }
+            return true;
+        } else if(resolved.isStringLiteral()){
+            this.append(`"${resolved.value}"`);
+            return true;
+        } else if(ts.isLiteralTypeNode(typeNode)){
+            const {
+                literal
+            } = typeNode;
+            return this.#getDefaultExpressionFromTypeNode(literal);
+        } else if(ts.isTypeReferenceNode(typeNode)){
+            if(ts.isPropertySignature(typeNode.parent)){
+                if(typeNode.parent.questionToken){
+                    this.append('undefined');
+                    return true;
+                }
+            }
+            return false;
+        }
+        return this.#getDefaultExpressionFromTypeNode(typeNode);
+    }
+    #getDefaultExpressionFromTypeNode(
+        typeNode: (
+            ts.TypeNode | ts.NullLiteral | ts.BooleanLiteral |
+            ts.LiteralExpression | ts.PrefixUnaryExpression
+        )
+    ){
+        switch(typeNode.kind){
+            case ts.SyntaxKind.NumberKeyword:
+                this.append('0');
+                break;
+            case ts.SyntaxKind.StringKeyword:
+                this.append('\'\'');
+                break;
+            case ts.SyntaxKind.NullKeyword:
+                this.append('null');
+                break;
+            case ts.SyntaxKind.ArrayType:
+                this.append('[]');
+                break;
+            case ts.SyntaxKind.BooleanKeyword:
+                this.append('false');
+                break;
+            case ts.SyntaxKind.TrueKeyword:
+                this.append('true');
+                break;
+            case ts.SyntaxKind.FalseKeyword:
+                this.append('false');
+                break;
+            default:
+                return false;
         }
         return true;
     }
@@ -382,6 +394,7 @@ export default class CodeGenerator extends CodeStream {
                     typeNode: member.type,
                     varName: `value['${member.name.escapedText}']`
                 })){
+                    debugger;
                     console.error('failed to generate type node validation code for type node kind: %d',member.type.kind);
                     result = false;
                     break;
@@ -391,60 +404,75 @@ export default class CodeGenerator extends CodeStream {
         },'}\n');
         return result;
     }
-    #generateTypeValidationExpression({
-        varName,
-        typeNode
-    }:{
-        typeNode: ts.TypeNode;
-        varName: string;
-    }) {
-        const resolved = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
-        if(resolved.isLiteral()){
-            // resolved;
-            console.log('%s: %o','isLiteral',resolved);
-        } else if(resolved.isStringLiteral()){
-            // resolved;
-            console.log('%s: %o','isStringLiteral',resolved);
-        } else if(resolved.isClassOrInterface()) {
-            // resolved;
-            console.log('%s: %o','isClassOrInterface',resolved);
-        }
-        let typeOfCheck: string | null;
-        switch(typeNode.kind){
-            case ts.SyntaxKind.NumberKeyword:
-                typeOfCheck = 'number';
-                break;
-            case ts.SyntaxKind.BigIntKeyword:
-                typeOfCheck = 'bigint';
-                break;
-            case ts.SyntaxKind.StringKeyword:
-                typeOfCheck = 'string';
-                break;
-            case ts.SyntaxKind.NullKeyword:
-                this.append(`${varName} === null`);
-                return true;
-            // default: {
-            //     const c = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
-            //     if(c.isClassOrInterface()) {
-            //         if(!this.#generateTypeValidationCode({
-            //             expression: {
-            //                 type: c
-            //             },
-            //             varName
-            //         })){
-            //             return false;
-            //         }
-            //     } else {
-            //         this.append(`${varName} instanceof ${c.symbol.escapedName}`);
-            //     }
-            //     return true;
-            // }
-            default:
-                return false;
-        }
-        this.append(`typeof ${varName} === '${typeOfCheck}'`);
-        return true;
-    }
+    // #generateTypeValidationExpression({
+    //     varName,
+    //     typeNode
+    // }:{
+    //     typeNode: ts.TypeNode;
+    //     varName: string;
+    // }) {
+    //     if(ts.isUnionTypeNode(typeNode)){
+    //         this.write('if(\n', () => {
+    //             const lastTypeNode = typeNode.types[typeNode.types.length - 1];
+    //             for(const t of typeNode.types){
+    //                 this.write('!(\m', () => {
+    //                     if(!this.#generateTypeNodeValidationCode({
+    //                         typeNode: t,
+    //                         varName
+    //                     })){
+    //                         console.error('failed to generate type validation code for node: %o',t);
+    //                     }
+    //                 },')');
+    //                 if(t !== lastTypeNode){
+    //                     this.append(' &&');
+    //                 }
+    //                 this.append('\n');
+    //             }
+
+    //         },') return false;')
+    //         return true;
+    //     } else if(ts.isLiteralTypeNode(typeNode)){
+    //         this.#generateTypeValidationExpression({
+    //             typeNode: typeNode.literal
+    //         })
+    //     }
+    //     // const resolved = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
+    //     let typeOfCheck: string | null;
+    //     switch(typeNode.kind){
+    //         case ts.SyntaxKind.NumberKeyword:
+    //             typeOfCheck = 'number';
+    //             break;
+    //         case ts.SyntaxKind.BigIntKeyword:
+    //             typeOfCheck = 'bigint';
+    //             break;
+    //         case ts.SyntaxKind.StringKeyword:
+    //             typeOfCheck = 'string';
+    //             break;
+    //         case ts.SyntaxKind.NullKeyword:
+    //             this.append(`${varName} === null`);
+    //             return true;
+    //         // default: {
+    //         //     const c = this.#program.getTypeChecker().getTypeFromTypeNode(typeNode);
+    //         //     if(c.isClassOrInterface()) {
+    //         //         if(!this.#generateTypeValidationCode({
+    //         //             expression: {
+    //         //                 type: c
+    //         //             },
+    //         //             varName
+    //         //         })){
+    //         //             return false;
+    //         //         }
+    //         //     } else {
+    //         //         this.append(`${varName} instanceof ${c.symbol.escapedName}`);
+    //         //     }
+    //         //     return true;
+    //         // }
+    //         default:
+    //             return false;
+    //     }
+    //     this.append(`typeof ${varName} === '${typeOfCheck}'`);
+    //     return true;
+    // }
     #import(modules: string[],file: string){
         let oldModules = this.#current?.requires.get(file);
         if(!oldModules){
@@ -530,16 +558,16 @@ export default class CodeGenerator extends CodeStream {
             this.write('if(\n', () => {
                 const lastType = typeNode.types[typeNode.types.length - 1];
                 for(const type of typeNode.types){
-                    this.write('!(() => (\n', () => {
-                        this.write('');
-                        if(!this.#generateTypeValidationExpression({
+                    this.write('!(() => {\n', () => {
+                        if(!this.#generateTypeNodeValidationCode({
                             typeNode: type,
                             varName
                         })){
+                            console.error('failed to generate type validation expression for kind: %d',type.kind);
                             status = false;
                         }
-                        this.append('\n');
-                    },'))()');
+                        this.write('return true;\n');
+                    },'})()');
                     if(type !== lastType){
                         this.append(' &&');
                     }
@@ -547,6 +575,7 @@ export default class CodeGenerator extends CodeStream {
                 }
             },') return false;\n');
             if(!status){
+                console.error('failed to generate code for union type node: %o',typeNode);
                 return false;
             }
         } else {

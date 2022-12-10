@@ -10,3 +10,9 @@ export interface IAttachment {
 export interface IWithOptionalType {
     name?: string;
 }
+
+export interface ITest {
+    a?: number;
+    b?: string | number;
+    c: string | null;
+}

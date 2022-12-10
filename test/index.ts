@@ -1,10 +1,24 @@
-export interface ICharacter {
-    id: string;
+export interface IMarvelCharacterResultItem {
+    id: number;
     name: string;
     description: string;
+    thumbnail: {
+        path: string;
+        extension: string;
+    };
+    resourceURI: string;
+    comics: {
+        available: number;
+        collectionURI: string;
+        items: {
+            resourceURI: string;
+            name: string;
+        }[];
+        
+    };
 }
 
-export interface ICharacterResult{
+export interface IMarvelCharacterResult{
     code: number;
     status: string;
     attributionText: string;
@@ -15,25 +29,7 @@ export interface ICharacterResult{
         limit: number;
         total: number;
         count: number;
-        results: {
-            id: number;
-            name: string;
-            description: string;
-            thumbnail: {
-                path: string;
-                extension: string;
-            };
-            resourceURI: string;
-            comics: {
-                available: number;
-                collectionURI: string;
-                items: {
-                    resourceURI: string;
-                    name: string;
-                }[];
-                
-            };
-        }[];
+        results: IMarvelCharacterResultItem[];
     };
 }
 
