@@ -320,6 +320,10 @@ export default class CodeGenerator extends CodeStream {
             ts.LiteralExpression | ts.PrefixUnaryExpression
         )
     ){
+        if(ts.isStringLiteral(typeNode)){
+            this.append(`"${typeNode.text}"`);
+            return true;
+        }
         switch(typeNode.kind){
             case ts.SyntaxKind.NumberKeyword:
                 this.append('0');
