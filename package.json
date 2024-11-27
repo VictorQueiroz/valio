@@ -12,7 +12,7 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.16.0"
   },
-  "version": "0.0.18",
+  "version": "0.0.19",
   "license": "MIT",
   "name": "valio",
   "dependencies": {
@@ -32,9 +32,9 @@
     "validation"
   ],
   "scripts": {
-    "prepack": "yarn run build",
-    "test": "yarn run build && npx ts-node cli",
+    "prepack": "npm run build",
+    "test": "npm run build && npx ts-node cli",
     "build": "npx tsc -b . --force",
-    "prepublishOnly": "yarn run build"
+    "prepublishOnly": "npm run build"
   }
 }
