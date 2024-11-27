@@ -1,16 +1,23 @@
 {
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/glob": "8.x",
-    "@types/node": "16.x",
-    "prettier": "2.x",
-    "ts-node": "10.x"
+    "@types/node": "^22.10.0",
+    "child-process-utilities": "^0.1.8",
+    "cli-argument-helper": "^2.3.0",
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "prettier": "^2.7.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0"
   },
-  "version": "0.0.17",
+  "version": "0.0.18",
   "license": "MIT",
   "name": "valio",
   "dependencies": {
-    "glob": "8.x",
-    "typescript": "4.x"
+    "@textstream/core": "^0.3.1",
+    "glob": "8.x"
   },
   "files": [
     "**/*.js",
